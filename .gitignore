@@ -50,3 +50,15 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+
+# SDCC Intermediates and Outputs
+*.sym
+*.rst
+*.rel
+*.ihx
+*.lk
+*.lst
+*.mem
+*.asm
+
