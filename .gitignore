@@ -61,4 +61,4 @@ dkms.conf
 *.lst
 *.mem
 *.asm
-
+*.bin
