@@ -300,5 +300,12 @@ SFRX(PWM7T2H, 0xff52);
 SFRX(PWM7T2L, 0xff53);
 SFRX(PWM7CR,  0xff54);
 
+/* Interrupt numbers: address = (number * 8) + 3 */
+#define IE0_VECTOR      0       /* 0x03 external interrupt 0 */
+#define TF0_VECTOR      1       /* 0x0b timer 0 */
+#define IE1_VECTOR      2       /* 0x13 external interrupt 1 */
+#define TF1_VECTOR      3       /* 0x1b timer 1 */
+#define SI0_VECTOR      4       /* 0x23 serial port 0 */
+
 #endif
 
