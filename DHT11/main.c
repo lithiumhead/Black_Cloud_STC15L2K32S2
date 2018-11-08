@@ -3,6 +3,11 @@
 
 #define DHT11_pin       P3_5
 
+#define _nop_() \
+      __asm     \
+          nop   \
+      __endasm  \
+
 #include "../STC15F2K60S2.H"
  
 typedef unsigned char BYTE;
@@ -28,11 +33,17 @@ unsigned char DHT11_data[5];
 
 void SendData(BYTE dat);
 void SendString(char *s);
+
 void DHT11_init();
 unsigned short DHT11_get_byte();
 unsigned short DHT11_get_data();
 
+void uitoa(unsigned int value, char* string, int radix);
+void itoa(int value, char* string, int radix);
+
 void main() {
+  char reading[5] = {0}; //Store Temperature/Humidity String here
+
   P0M0 = 0x00;
   P0M1 = 0x00;
   P1M0 = 0x00;
@@ -82,7 +93,38 @@ void main() {
   DHT11_init();
 
   SendString("STC15L2K32S2\r\nUART1 @ 115200 bps!\r\nDHT11 @ P3.5:\r\n");
-  while(1);
+  while(1) {
+    state = DHT11_get_byte();
+    switch(state) {
+      case 1: {
+      }
+      case 2: {
+        SendString("No Sensor Found!\r\n");
+      } break;
+      case 3: {
+        SendString("Checksum Error!\r\n");
+      } break;
+      default: {
+        SendString("Humidity: ");
+        uitoa(DHT11_data[0], reading, 10);
+        SendString(reading);
+        SendString(" % | Temperature: ");
+        uitoa(DHT11_data[2], reading, 10);
+        SendString(reading);
+        SendString(" Celsius\r\n");
+      } break;
+    };
+    { //1 second delay @11.0592MHz
+      unsigned char i = 43, j = 6, k = 203;
+      _nop_();
+      _nop_();
+      do {
+        do {
+          while (--k);
+        } while (--j);
+      } while (--i);
+    }
+  };
 }
  
 // UART Interrupt service routine
@@ -168,7 +210,7 @@ unsigned short DHT11_get_byte() {
 
 //Get a complete reading from DHT11
 unsigned short DHT11_get_data() {
-  bit chk;
+  __bit chk;
   unsigned short s = 0;
   unsigned char check_sum = 0;
 
@@ -229,5 +271,37 @@ unsigned short DHT11_get_data() {
     return 3;
   } else {
     return 0;
+  }
+}
+
+
+#define NUMBER_OF_DIGITS 16   // space for NUMBER_OF_DIGITS + '\0'
+
+void uitoa(unsigned int value, char* string, int radix) {
+  unsigned char index, i;
+
+  index = NUMBER_OF_DIGITS;
+  i = 0;
+
+  do {
+    string[--index] = '0' + (value % radix);
+    if ( string[index] > '9') string[index] += 'A' - ':';   // continue with A, B,..
+    value /= radix;
+  } while (value != 0);
+
+  do {
+    string[i++] = string[index++];
+  } while ( index < NUMBER_OF_DIGITS );
+
+  string[i] = 0; // string terminator
+}
+
+void itoa(int value, char* string, int radix) {
+  if (value < 0 && radix == 10) {
+    *string++ = '-';
+    uitoa(-value, string, radix);
+  }
+  else {
+    uitoa(value, string, radix);
   }
 }
