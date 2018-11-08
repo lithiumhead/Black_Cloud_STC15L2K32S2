@@ -1,10 +1,6 @@
 // Program Description: Read DHT11 and send to UART
 // Author: Anurag Chugh
 
-#define DHT11_pin P3_5
-
-#define _nop_() __asm nop __endasm
-
 #include "../STC15F2K60S2.H"
 
 typedef unsigned char BYTE;
@@ -26,14 +22,22 @@ typedef unsigned int WORD;
 
 char busy;
 
-unsigned char DHT11_data[5];
+// DHT11 Bytes
+unsigned char TP_H=0;
+unsigned char TP_L=0;
+unsigned char RH_H=0;
+unsigned char RH_L=0;
+unsigned char CR_D=0;
+#define DHT11_pin P3_5
 
 void SendData(BYTE dat);
 void SendString(char *s);
 
+void delay_5us(unsigned char us);
+void delay_ms(unsigned long cnt);
+
 void DHT11_init();
-unsigned short DHT11_get_byte();
-unsigned short DHT11_get_data();
+__bit DHT11_ReadBit(void);
 
 void uitoa(unsigned int value, char *string, int radix);
 void itoa(int value, char *string, int radix);
@@ -112,17 +116,7 @@ void main() {
       SendString(" Celsius\r\n");
     } break;
     };
-    { // 1 second delay @11.0592MHz
-      unsigned char i = 43, j = 6, k = 203;
-      _nop_();
-      _nop_();
-      do {
-        do {
-          while (--k)
-            ;
-        } while (--j);
-      } while (--i);
-    }
+    delay_ms(1000);
   };
 }
 
@@ -171,115 +165,84 @@ void SendString(char *s) {
   }
 }
 
+// Delay function
+void delay_5us(unsigned char us) {
+  unsigned char i=0;
+  for(;us;us--)
+  for(i=0;i<14;i++);
+}
+
+// Delay function
+void delay_ms(unsigned long cnt) {
+  for(;cnt;cnt--)
+  delay_5us(200);
+}
+
 // DHT11 Data pin initialization
 void DHT11_init() {
   DHT11_pin = 1;
-  { // 1 second delay @11.0592MHz
-    unsigned char i = 43, j = 6, k = 203;
-    _nop_();
-    _nop_();
-    do {
-      do {
-        while (--k)
-          ;
-      } while (--j);
-    } while (--i);
-  }
+  delay_ms(1000);
 }
 
-// Get a byte from DHT11
-unsigned short DHT11_get_byte() {
-  unsigned short s = 0;
-  unsigned short value = 0;
-  for (s = 0; s < 8; s += 1) {
-    value <<= 1;
-    while ((DHT11_pin == 0))
-      ;
-    { // 30 us delay @11.0592MHz
-      unsigned char i = 80;
-      _nop_();
-      _nop_();
-      while (--i)
-        ;
-    }
-    if (DHT11_pin == 1) {
-      value |= 1;
-    }
-    while (DHT11_pin == 1)
-      ;
-  }
-  return value;
-}
-
-// Get a complete reading from DHT11
-unsigned short DHT11_get_data() {
-  __bit chk;
-  unsigned short s = 0;
-  unsigned char check_sum = 0;
-
-  DHT11_pin = 1;
-  DHT11_pin = 0;
-  { // 18 ms delay @11.0592MHz
-    unsigned char i = 1, j = 194, k = 160;
-    do {
-      do {
-        while (--k)
-          ;
-      } while (--j);
-    } while (--i);
-  }
-  DHT11_pin = 1;
-  { // 26 us delay @11.0592MHz
-    unsigned char i = 69;
-    _nop_();
-    _nop_();
-    while (--i)
-      ;
-  }
-
-  chk = DHT11_pin;
-
-  if (chk) {
+// Read DHT11 Bit
+__bit DHT11_ReadBit(void) {
+  unsigned char t=0;
+  delay_5us(6);
+  while(DHT11_pin==0);
+  for(t=0;DHT11_pin;t++)
+    delay_5us(1); 
+  if(t>10)
     return 1;
-  }
-  { // 80 us delay @11.0592MHz
-    unsigned char i = 1, j = 217;
-    _nop_();
-    do {
-      while (--j)
-        ;
-    } while (--i);
-  }
-
-  chk = DHT11_pin;
-  if (!chk) {
-    return 2;
-  }
-  { // 80 us delay @11.0592MHz
-    unsigned char i = 1, j = 217;
-    _nop_();
-    do {
-      while (--j)
-        ;
-    } while (--i);
-  }
-
-  for (s = 0; s <= 4; s += 1) {
-    DHT11_data[s] = DHT11_get_byte();
-  }
-
-  DHT11_pin = 1;
-
-  for (s = 0; s < 4; s += 1) {
-    check_sum += DHT11_data[s];
-  }
-
-  if (check_sum != DHT11_data[4]) {
-    return 3;
-  } else {
+  else
     return 0;
+}
+
+void DHT11_Read(void) {
+  unsigned char i;
+  DHT11_pin=0;
+  Delay2(20);
+  DHT11_pin=1;
+  delay_5us(10);
+  while(DHT11_pin==0);
+  delay_5us(6);
+  while(DHT11_pin);
+  for(i=0;i<8;i++) {
+  if(DHT11_ReadBit())
+  TP_H=((TP_H<<1)+1);
+  else
+  TP_H<<=1;
+  }
+  for(i=0;i<8;i++)
+  {
+  if(DHT11_ReadBit())
+  TP_L=((TP_L<<1)+1);
+  else
+  TP_L<<=1;
+  }
+    for(i=0;i<8;i++)
+  {
+  if(DHT11_ReadBit())
+  RH_H=((RH_H<<1)+1);
+  else
+  RH_H<<=1;
+  }
+    for(i=0;i<8;i++)
+  {
+  if(DHT11_ReadBit())
+  RH_L=((RH_L<<1)+1);
+  else
+  RH_L<<=1;
+  }
+  for(i=0;i<8;i++)
+  {
+  if(DHT11_ReadBit())
+  CR_D=((CR_D<<1)+1);
+  else
+  CR_D<<=1;
   }
 }
+
+
 
 #define NUMBER_OF_DIGITS 16 // space for NUMBER_OF_DIGITS + '\0'
 
