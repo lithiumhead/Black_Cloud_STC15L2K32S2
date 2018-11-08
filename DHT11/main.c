@@ -36,11 +36,8 @@ void SendString(char *s);
 void delay_5us(unsigned char us);
 void delay_ms(unsigned long cnt);
 
-void DHT11_init();
 __bit DHT11_ReadBit(void);
-
-void uitoa(unsigned int value, char *string, int radix);
-void itoa(int value, char *string, int radix);
+void DHT11_Read(void);
 
 void main() {
   P0M0 = 0x00;
@@ -90,18 +87,19 @@ void main() {
   ES = 1;       // Enable serial port 1 interrupt.
   EA = 1;
 
-  DHT11_init();
-
-  SendString("STC15L2K32S2\r\nUART1 @ 115200 bps!\r\nDHT11 @ P3.5:\r\n");
+  SendString("STC15L2K32S2\r\nUART1 @ 115200 bps! | DHT11 @ P3.5\r\n");
   while (1) {
     char reading[4] = {0}; // Store Temperature/Humidity String here
     DHT11_Read();
     SendString("Humidity: ");
-    uitoa(RH_H, reading, 10);
+    SendData(((RH_H%100)/10)+'0');
+    SendData(((RH_H%10))+'0');
+    SendData((RH_L)+'0');
     SendString(reading);
     SendString(" % | Temperature: ");
-    uitoa(TP_H, reading, 10);
-    SendString(reading);
+    SendData(((TP_H%100)/10)+'0');
+    SendData(((TP_H%10))+'0');
+    SendData((TP_L)+'0');
     SendString(" Celsius\r\n");
     delay_ms(1000);
   };
@@ -166,12 +164,6 @@ void delay_ms(unsigned long cnt) {
     delay_5us(200);
 }
 
-// DHT11 Data pin initialization
-void DHT11_init() {
-  DHT11_pin = 1;
-  delay_ms(1000);
-}
-
 // Read DHT11 Bit
 __bit DHT11_ReadBit(void) {
   unsigned char t = 0;
@@ -189,7 +181,7 @@ __bit DHT11_ReadBit(void) {
 void DHT11_Read(void) {
   unsigned char i;
   DHT11_pin = 0;
-  Delay2(20);
+  delay_ms(20);
   DHT11_pin = 1;
   delay_5us(10);
   while (DHT11_pin == 0)
@@ -226,36 +218,5 @@ void DHT11_Read(void) {
       CR_D = ((CR_D << 1) + 1);
     else
       CR_D <<= 1;
-  }
-}
-
-#define NUMBER_OF_DIGITS 16 // space for NUMBER_OF_DIGITS + '\0'
-
-void uitoa(unsigned int value, char *string, int radix) {
-  unsigned char index, i;
-
-  index = NUMBER_OF_DIGITS;
-  i = 0;
-
-  do {
-    string[--index] = '0' + (value % radix);
-    if (string[index] > '9')
-      string[index] += 'A' - ':'; // continue with A, B,..
-    value /= radix;
-  } while (value != 0);
-
-  do {
-    string[i++] = string[index++];
-  } while (index < NUMBER_OF_DIGITS);
-
-  string[i] = 0; // string terminator
-}
-
-void itoa(int value, char *string, int radix) {
-  if (value < 0 && radix == 10) {
-    *string++ = '-';
-    uitoa(-value, string, radix);
-  } else {
-    uitoa(value, string, radix);
   }
 }
