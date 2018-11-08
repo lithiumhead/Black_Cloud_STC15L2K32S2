@@ -1,5 +1,7 @@
-//Program Description:  Emulate a simple integer calculator over a Serial Link
+//Program Description: Read DHT11 and send to UART
 //Author: Anurag Chugh
+
+#define DHT11_pin       P3_5
 
 #include "../STC15F2K60S2.H"
  
@@ -21,10 +23,15 @@ typedef unsigned int WORD;
 #define S1_S1 0x80              //P_SW1.7
  
 char busy;
- 
+
+unsigned char DHT11_data[5];
+
 void SendData(BYTE dat);
 void SendString(char *s);
- 
+void DHT11_init();
+unsigned short DHT11_get_byte();
+unsigned short DHT11_get_data();
+
 void main() {
   P0M0 = 0x00;
   P0M1 = 0x00;
@@ -72,7 +79,9 @@ void main() {
   ES = 1;                     //Enable serial port 1 interrupt.
   EA = 1;
  
-  SendString("STC15L2K32S2\r\nUART1 Test 115200 bps!\r\n");
+  DHT11_init();
+
+  SendString("STC15L2K32S2\r\nUART1 @ 115200 bps!\r\nDHT11 @ P3.5:\r\n");
   while(1);
 }
  
@@ -91,13 +100,12 @@ void Uart(void) __interrupt(SI0_VECTOR) {
     busy = 0;
   }
 }
- 
+
 // Send a character over UART
-void SendData(BYTE dat)
-{
+void SendData(BYTE dat) {
   while (busy);               //Waiting for the previous data to be sent
   ACC = dat;                  //Get check bit (PSW.0)
-  if (P) {                      //Set check bit according to Parity
+  if (P) {                    //Set check bit according to Parity
 #if (PARITYBIT == ODD_PARITY)
     TB8 = 0;                //Set Check Bit to 0
 #elif (PARITYBIT == EVEN_PARITY)
@@ -116,7 +124,110 @@ void SendData(BYTE dat)
 
 // Send a whole string over UART
 void SendString(char *s) {
-  while (*s) {                  //Detect string end character '\0'
+  while (*s) {                //Detect string end character '\0'
     SendData(*s++);         //Send current character
+  }
+}
+
+// DHT11 Data pin initialization
+void DHT11_init() {
+  DHT11_pin = 1;
+  { //1 second delay @11.0592MHz
+    unsigned char i = 43, j = 6, k = 203;
+    _nop_();
+    _nop_();
+    do {
+      do {
+        while (--k);
+      } while (--j);
+    } while (--i);
+  }
+}
+
+// Get a byte from DHT11
+unsigned short DHT11_get_byte() {
+  unsigned short s = 0;
+  unsigned short value = 0;
+  for(s = 0; s < 8; s += 1)
+  {
+    value <<= 1;
+    while((DHT11_pin == 0));
+    { //30 us delay @11.0592MHz
+      unsigned char i = 80;
+      _nop_();
+      _nop_();
+      while (--i);
+    }
+    if(DHT11_pin == 1) {
+        value |= 1;
+    }
+    while(DHT11_pin == 1);
+  }
+  return value;
+}
+
+//Get a complete reading from DHT11
+unsigned short DHT11_get_data() {
+  bit chk;
+  unsigned short s = 0;
+  unsigned char check_sum = 0;
+
+  DHT11_pin = 1;
+  DHT11_pin = 0;
+  { //18 ms delay @11.0592MHz
+    unsigned char i = 1, j = 194, k = 160;
+    do {
+      do {
+        while (--k);
+      } while (--j);
+    } while (--i);
+  }
+  DHT11_pin = 1;
+  { //26 us delay @11.0592MHz
+    unsigned char i = 69;
+    _nop_();
+    _nop_();
+    while (--i);
+  }
+
+  chk = DHT11_pin;
+
+  if(chk) {
+    return 1;
+  }
+  { //80 us delay @11.0592MHz
+    unsigned char i = 1, j = 217;
+    _nop_();
+    do {
+      while (--j);
+    } while (--i);
+  }
+
+  chk = DHT11_pin;
+  if(!chk) {
+    return 2;
+  }
+  { //80 us delay @11.0592MHz
+    unsigned char i = 1, j = 217;
+    _nop_();
+    do {
+      while (--j);
+    } while (--i);
+  }
+
+  for(s = 0; s <= 4; s += 1) {
+     DHT11_data[s] = DHT11_get_byte();
+  }
+
+  DHT11_pin = 1;
+
+  for(s = 0; s < 4; s += 1) {
+     check_sum += DHT11_data[s];
+  }
+
+  if(check_sum != DHT11_data[4]) {
+    return 3;
+  } else {
+    return 0;
   }
 }
