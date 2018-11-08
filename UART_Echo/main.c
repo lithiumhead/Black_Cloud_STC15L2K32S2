@@ -68,9 +68,9 @@ void main()
  
     T2L = (65536 - (FOSC/4/BAUD));   //Set baud rate reload value
     T2H = (65536 - (FOSC/4/BAUD))>>8;
-    AUXR = 0x14;                //T2为1T模式, 并启动定时器2
-    AUXR |= 0x01;               //选择定时器2为串口1的波特率发生器
-    ES = 1;                     //使能串口1中断
+    AUXR = 0x14;                //T2 is in 1T mode, and start Timer 2.
+    AUXR |= 0x01;               //Select Timer 2 as the baud rate generator of serial port 1.
+    ES = 1;                     //Enable serial port 1 interrupt.
     EA = 1;
  
     SendString("STC15L2K32S2\r\nUART1 Test 115200 bps!\r\n");
@@ -103,35 +103,32 @@ Send serial data
 ----------------------------*/
 void SendData(BYTE dat)
 {
-    while (busy);               //等待前面的数据发送完成
-    ACC = dat;                  //获取校验位P (PSW.0)
-    if (P)                      //根据P来设置校验位
+    while (busy);               //Waiting for the previous data to be sent
+    ACC = dat;                  //Get check bit (PSW.0)
+    if (P)                      //Set check bit according to Parity
     {
 #if (PARITYBIT == ODD_PARITY)
-        TB8 = 0;                //设置校验位为0
+        TB8 = 0;                //Set Check Bit to 0
 #elif (PARITYBIT == EVEN_PARITY)
-        TB8 = 1;                //设置校验位为1
+        TB8 = 1;                //Set Check Bit to 1
 #endif
     }
     else
     {
 #if (PARITYBIT == ODD_PARITY)
-        TB8 = 1;                //设置校验位为1
+        TB8 = 1;                //Set Check Bit to 1
 #elif (PARITYBIT == EVEN_PARITY)
-        TB8 = 0;                //设置校验位为0
+        TB8 = 0;                //Set Check Bit to 0
 #endif
     }
     busy = 1;
-    SBUF = ACC;                 //写数据到UART数据寄存器
+    SBUF = ACC;                 //Write data to the UART data register
 }
  
-/*----------------------------
-发送字符串
-----------------------------*/
 void SendString(char *s)
 {
-    while (*s)                  //检测字符串结束标志
+    while (*s)                  //Detect string end character '\0'
     {
-        SendData(*s++);         //发送当前字符
+        SendData(*s++);         //Send current character
     }
 }
