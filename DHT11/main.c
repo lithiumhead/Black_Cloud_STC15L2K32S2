@@ -43,8 +43,6 @@ void uitoa(unsigned int value, char *string, int radix);
 void itoa(int value, char *string, int radix);
 
 void main() {
-  char reading[5] = {0}; // Store Temperature/Humidity String here
-
   P0M0 = 0x00;
   P0M1 = 0x00;
   P1M0 = 0x00;
@@ -96,26 +94,15 @@ void main() {
 
   SendString("STC15L2K32S2\r\nUART1 @ 115200 bps!\r\nDHT11 @ P3.5:\r\n");
   while (1) {
-    unsigned char state = DHT11_get_data();
-    switch (state) {
-    case 1: {
-    }
-    case 2: {
-      SendString("No Sensor Found!\r\n");
-    } break;
-    case 3: {
-      SendString("Checksum Error!\r\n");
-    } break;
-    default: {
-      SendString("Humidity: ");
-      uitoa(DHT11_data[0], reading, 10);
-      SendString(reading);
-      SendString(" % | Temperature: ");
-      uitoa(DHT11_data[2], reading, 10);
-      SendString(reading);
-      SendString(" Celsius\r\n");
-    } break;
-    };
+    char reading[4] = {0}; // Store Temperature/Humidity String here
+    DHT11_Read();
+    SendString("Humidity: ");
+    uitoa(RH_H, reading, 10);
+    SendString(reading);
+    SendString(" % | Temperature: ");
+    uitoa(TP_H, reading, 10);
+    SendString(reading);
+    SendString(" Celsius\r\n");
     delay_ms(1000);
   };
 }
