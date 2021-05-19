@@ -4,10 +4,13 @@
 #include "../STC15F2K60S2.H"
 
 typedef unsigned char BYTE;
-typedef unsigned int WORD;
 
-#define FOSC 11059200L
-#define BAUD 115200
+#define OSCILLATOR_FREQ_HZ 11059200UL
+#define BAUD_BPS 115200UL
+
+#define BAUD_RELOAD (65536UL - (OSCILLATOR_FREQ_HZ / 4UL / BAUD_BPS))
+#define BAUD_RELOAD_L ((BAUD_RELOAD) & 0xff)
+#define BAUD_RELOAD_H ((BAUD_RELOAD>>8) & 0xff)
 
 #define NONE_PARITY 0
 #define ODD_PARITY 1
@@ -15,7 +18,7 @@ typedef unsigned int WORD;
 #define MARK_PARITY 3
 #define SPACE_PARITY 4
 
-#define PARITYBIT EVEN_PARITY
+#define PARITYBIT NONE_PARITY
 
 #define S1_S0 0x40 // P_SW1.6
 #define S1_S1 0x80 // P_SW1.7
@@ -28,7 +31,7 @@ unsigned char TP_L = 0;
 unsigned char RH_H = 0;
 unsigned char RH_L = 0;
 unsigned char CR_D = 0;
-#define DHT11_pin P3_5
+#define DHT11_PIN P3_5
 
 void SendData(BYTE dat);
 void SendString(char *s);
@@ -46,8 +49,8 @@ void main() {
   P1M1 = 0x00;
   P2M0 = 0x00;
   P2M1 = 0x00;
-  P3M0 = 0x00;
-  P3M1 = 0x00;
+  P3M0 = 0x00; // P3M1.n,P3M0.n   =00--->Standard,    01--->push-pull
+  P3M1 = 0x00; //                 =10--->pure input,  11--->open drain
   P4M0 = 0x00;
   P4M1 = 0x00;
   P5M0 = 0x00;
@@ -59,17 +62,7 @@ void main() {
 
   ACC = P_SW1;
   ACC &= ~(S1_S0 | S1_S1); // S1_S0=0 S1_S1=0
-  P_SW1 = ACC;             //(P3.0/RxD, P3.1/TxD)
-
-  //  ACC = P_SW1;
-  //  ACC &= ~(S1_S0 | S1_S1);    //S1_S0=1 S1_S1=0
-  //  ACC |= S1_S0;               //(P3.6/RxD_2, P3.7/TxD_2)
-  //  P_SW1 = ACC;
-  //
-  //  ACC = P_SW1;
-  //  ACC &= ~(S1_S0 | S1_S1);    //S1_S0=0 S1_S1=1
-  //  ACC |= S1_S1;               //(P1.6/RxD_3, P1.7/TxD_3)
-  //  P_SW1 = ACC;
+  P_SW1 = ACC;             // Use P3.0/RxD, P3.1/TxD
 
 #if (PARITYBIT == NONE_PARITY)
   SCON = 0x50; // 8-bit variable baud rate
@@ -80,8 +73,8 @@ void main() {
   SCON = 0xd2; // 9-bit variable baud rate, parity bit is initially 0
 #endif
 
-  T2L = (65536 - (FOSC / 4 / BAUD)); // Set baud rate reload value
-  T2H = (65536 - (FOSC / 4 / BAUD)) >> 8;
+  T2L = BAUD_RELOAD_L; // Set baud rate reload value
+  T2H = BAUD_RELOAD_H;
   AUXR = 0x14;  // T2 is in 1T mode, and start Timer 2.
   AUXR |= 0x01; // Select Timer 2 as the baud rate generator of serial port 1.
   ES = 1;       // Enable serial port 1 interrupt.
@@ -89,13 +82,11 @@ void main() {
 
   SendString("STC15L2K32S2\r\nUART1 @ 115200 bps! | DHT11 @ P3.5\r\n");
   while (1) {
-    char reading[4] = {0}; // Store Temperature/Humidity String here
     DHT11_Read();
     SendString("Humidity: ");
     SendData(((RH_H%100)/10)+'0');
     SendData(((RH_H%10))+'0');
     SendData((RH_L)+'0');
-    SendString(reading);
     SendString(" % | Temperature: ");
     SendData(((TP_H%100)/10)+'0');
     SendData(((TP_H%10))+'0');
@@ -103,22 +94,6 @@ void main() {
     SendString(" Celsius\r\n");
     delay_ms(1000);
   };
-}
-
-// UART Interrupt service routine
-void Uart(void) __interrupt(SI0_VECTOR) {
-  BYTE received_byte = 0;
-  if (RI) {
-    RI = 0;
-    received_byte = SBUF;
-    received_byte += 1;
-    SendData(received_byte);
-    P2_2 = RB8;
-  }
-  if (TI) {
-    TI = 0;
-    busy = 0;
-  }
 }
 
 // Send a character over UART
@@ -168,9 +143,9 @@ void delay_ms(unsigned long cnt) {
 __bit DHT11_ReadBit(void) {
   unsigned char t = 0;
   delay_5us(6);
-  while (DHT11_pin == 0)
+  while (DHT11_PIN == 0)
     ;
-  for (t = 0; DHT11_pin; t++)
+  for (t = 0; DHT11_PIN; t++)
     delay_5us(1);
   if (t > 10)
     return 1;
@@ -180,14 +155,14 @@ __bit DHT11_ReadBit(void) {
 
 void DHT11_Read(void) {
   unsigned char i;
-  DHT11_pin = 0;
+  DHT11_PIN = 0;
   delay_ms(20);
-  DHT11_pin = 1;
+  DHT11_PIN = 1;
   delay_5us(10);
-  while (DHT11_pin == 0)
+  while (DHT11_PIN == 0)
     ;
   delay_5us(6);
-  while (DHT11_pin)
+  while (DHT11_PIN)
     ;
   for (i = 0; i < 8; i++) {
     if (DHT11_ReadBit())
